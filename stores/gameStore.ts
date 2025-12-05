@@ -16,6 +16,7 @@ export interface GameResult {
     accuracy: number;
     timeMs: number;
     date: string;
+    synced?: boolean; // Track if synced to cloud
 }
 
 // Game configuration from setup screen
@@ -286,9 +287,37 @@ export const useGameStore = create<GameState>()(
                 }
             },
 
-            addToHistory: (result) => {
-                const history = [...get().history, result].slice(-50); // Keep last 50 games
+            addToHistory: async (result) => {
+                // Add to local history
+                const history = [...get().history, { ...result, synced: false }].slice(-50);
                 set({ history });
+
+                // Try to sync to cloud (fire and forget)
+                try {
+                    const { cloudSync } = await import('@/lib/cloudSync');
+                    const synced = await cloudSync.saveGame({
+                        id: result.id,
+                        mode: result.mode,
+                        difficulty: result.difficulty,
+                        operation: result.operation,
+                        score: result.score,
+                        correctCount: result.correctCount,
+                        totalCount: result.totalCount,
+                        accuracy: result.accuracy,
+                        timeMs: result.timeMs,
+                        date: result.date,
+                    });
+
+                    if (synced) {
+                        // Mark as synced in history
+                        const updatedHistory = get().history.map(g =>
+                            g.id === result.id ? { ...g, synced: true } : g
+                        );
+                        set({ history: updatedHistory });
+                    }
+                } catch (error) {
+                    console.log('Cloud sync skipped:', error);
+                }
             },
 
             clearHistory: () => set({ history: [] }),

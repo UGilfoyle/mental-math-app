@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,18 +9,45 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/Theme';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const {
+        signInWithGoogle,
+        signInWithApple,
+        signInWithEmail,
+        isLoading,
+        error,
+        clearError,
+        user,
+    } = useAuthStore();
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [isAppleAvailable, setIsAppleAvailable] = useState(false);
+
+    useEffect(() => {
+        // Check Apple Sign In availability
+        if (Platform.OS === 'ios') {
+            AppleAuthentication.isAvailableAsync().then(setIsAppleAvailable);
+        }
+    }, []);
+
+    useEffect(() => {
+        // If user is logged in, redirect to home
+        if (user) {
+            router.replace('/(tabs)');
+        }
+    }, [user]);
 
     const handleLogin = async () => {
         if (!email || !password) {
@@ -28,31 +55,33 @@ export default function LoginScreen() {
             return;
         }
 
-        setLoading(true);
-        // TODO: Integrate with Supabase
-        // const { error } = await auth.signIn(email, password);
-        setTimeout(() => {
-            setLoading(false);
+        clearError();
+        const result = await signInWithEmail(email, password);
+        if (result.success) {
             router.replace('/(tabs)');
-        }, 1000);
+        } else if (result.error) {
+            Alert.alert('Sign In Failed', result.error);
+        }
     };
 
     const handleGoogleLogin = async () => {
-        setLoading(true);
-        // TODO: Integrate with Supabase Google OAuth
-        setTimeout(() => {
-            setLoading(false);
+        clearError();
+        const result = await signInWithGoogle();
+        if (result.success) {
             router.replace('/auth/onboarding');
-        }, 1000);
+        } else if (result.error && result.error !== 'Sign in cancelled') {
+            Alert.alert('Google Sign In Failed', result.error);
+        }
     };
 
     const handleAppleLogin = async () => {
-        setLoading(true);
-        // TODO: Integrate with Supabase Apple OAuth
-        setTimeout(() => {
-            setLoading(false);
+        clearError();
+        const result = await signInWithApple();
+        if (result.success) {
             router.replace('/auth/onboarding');
-        }, 1000);
+        } else if (result.error && result.error !== 'Sign in cancelled') {
+            Alert.alert('Apple Sign In Failed', result.error);
+        }
     };
 
     const handleGuestMode = () => {
@@ -73,13 +102,47 @@ export default function LoginScreen() {
                 >
                     {/* Logo */}
                     <View style={styles.logoSection}>
-                        <Text style={styles.logoEmoji}>🧮</Text>
-                        <Text style={styles.title}>Mental Math</Text>
+                        <View style={styles.logoCircle}>
+                            <Ionicons name="calculator" size={48} color="#fff" />
+                        </View>
+                        <Text style={styles.title}>Mental Math Pro</Text>
                         <Text style={styles.subtitle}>Train your brain!</Text>
                     </View>
 
                     {/* Login Form */}
                     <View style={styles.formCard}>
+                        {/* Social Logins First */}
+                        <View style={styles.socialSection}>
+                            {/* Google Button */}
+                            <TouchableOpacity
+                                style={styles.socialButtonGoogle}
+                                onPress={handleGoogleLogin}
+                                disabled={isLoading}
+                            >
+                                <Ionicons name="logo-google" size={20} color="#EA4335" />
+                                <Text style={styles.socialTextGoogle}>Continue with Google</Text>
+                            </TouchableOpacity>
+
+                            {/* Apple Button (iOS only) */}
+                            {Platform.OS === 'ios' && isAppleAvailable && (
+                                <TouchableOpacity
+                                    style={styles.socialButtonApple}
+                                    onPress={handleAppleLogin}
+                                    disabled={isLoading}
+                                >
+                                    <Ionicons name="logo-apple" size={20} color="#fff" />
+                                    <Text style={styles.socialTextApple}>Continue with Apple</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Divider */}
+                        <View style={styles.divider}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>or sign in with email</Text>
+                            <View style={styles.dividerLine} />
+                        </View>
+
                         {/* Email Input */}
                         <View style={styles.inputGroup}>
                             <Text style={styles.inputLabel}>Email</Text>
@@ -93,6 +156,7 @@ export default function LoginScreen() {
                                     onChangeText={setEmail}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
+                                    autoComplete="email"
                                 />
                             </View>
                         </View>
@@ -124,40 +188,14 @@ export default function LoginScreen() {
                         <TouchableOpacity
                             style={styles.primaryButton}
                             onPress={handleLogin}
-                            disabled={loading}
+                            disabled={isLoading}
                         >
-                            {loading ? (
+                            {isLoading ? (
                                 <ActivityIndicator color="#7C3AED" />
                             ) : (
                                 <Text style={styles.primaryButtonText}>Sign In</Text>
                             )}
                         </TouchableOpacity>
-
-                        {/* Divider */}
-                        <View style={styles.divider}>
-                            <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>or continue with</Text>
-                            <View style={styles.dividerLine} />
-                        </View>
-
-                        {/* Social Logins */}
-                        <View style={styles.socialRow}>
-                            <TouchableOpacity
-                                style={styles.socialButton}
-                                onPress={handleGoogleLogin}
-                            >
-                                <Text style={styles.socialIcon}>G</Text>
-                                <Text style={styles.socialText}>Google</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.socialButton}
-                                onPress={handleAppleLogin}
-                            >
-                                <Ionicons name="logo-apple" size={20} color="#fff" />
-                                <Text style={styles.socialText}>Apple</Text>
-                            </TouchableOpacity>
-                        </View>
 
                         {/* Register Link */}
                         <View style={styles.registerRow}>
@@ -173,7 +211,20 @@ export default function LoginScreen() {
                         <Text style={styles.guestText}>Continue as Guest</Text>
                         <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.7)" />
                     </TouchableOpacity>
+
+                    {/* Footer */}
+                    <Text style={styles.footerText}>
+                        By continuing, you agree to our Terms of Service and Privacy Policy
+                    </Text>
                 </ScrollView>
+
+                {/* Loading Overlay */}
+                {isLoading && (
+                    <View style={styles.loadingOverlay}>
+                        <ActivityIndicator size="large" color="#fff" />
+                        <Text style={styles.loadingText}>Signing in...</Text>
+                    </View>
+                )}
             </SafeAreaView>
         </View>
     );
@@ -197,8 +248,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: Spacing['3xl'],
     },
-    logoEmoji: {
-        fontSize: 64,
+    logoCircle: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
         marginBottom: Spacing.md,
     },
     title: {
@@ -218,6 +274,38 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.2)',
         padding: Spacing.xl,
         marginBottom: Spacing.xl,
+    },
+    socialSection: {
+        gap: Spacing.md,
+        marginBottom: Spacing.lg,
+    },
+    socialButtonGoogle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.md,
+        backgroundColor: '#fff',
+        borderRadius: BorderRadius.xl,
+        paddingVertical: 14,
+    },
+    socialTextGoogle: {
+        fontSize: Fonts.base,
+        fontWeight: Fonts.semibold,
+        color: '#333',
+    },
+    socialButtonApple: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.md,
+        backgroundColor: '#000',
+        borderRadius: BorderRadius.xl,
+        paddingVertical: 14,
+    },
+    socialTextApple: {
+        fontSize: Fonts.base,
+        fontWeight: Fonts.semibold,
+        color: '#fff',
     },
     inputGroup: {
         marginBottom: Spacing.lg,
@@ -259,7 +347,7 @@ const styles = StyleSheet.create({
     divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: Spacing.xl,
+        marginVertical: Spacing.lg,
     },
     dividerLine: {
         flex: 1,
@@ -270,32 +358,6 @@ const styles = StyleSheet.create({
         fontSize: Fonts.sm,
         color: 'rgba(255,255,255,0.6)',
         paddingHorizontal: Spacing.md,
-    },
-    socialRow: {
-        flexDirection: 'row',
-        gap: Spacing.md,
-    },
-    socialButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: Spacing.sm,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: BorderRadius.lg,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        paddingVertical: Spacing.md,
-    },
-    socialIcon: {
-        fontSize: Fonts.lg,
-        fontWeight: Fonts.bold,
-        color: '#fff',
-    },
-    socialText: {
-        fontSize: Fonts.base,
-        fontWeight: Fonts.medium,
-        color: '#fff',
     },
     registerRow: {
         flexDirection: 'row',
@@ -321,5 +383,22 @@ const styles = StyleSheet.create({
     guestText: {
         fontSize: Fonts.base,
         color: 'rgba(255,255,255,0.7)',
+    },
+    footerText: {
+        fontSize: Fonts.xs,
+        color: 'rgba(255,255,255,0.5)',
+        textAlign: 'center',
+        marginTop: Spacing.md,
+    },
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: Spacing.md,
+        fontSize: Fonts.base,
+        color: '#fff',
     },
 });

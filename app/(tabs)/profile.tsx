@@ -7,11 +7,14 @@ import {
     SafeAreaView,
     TouchableOpacity,
     Dimensions,
+    Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/Theme';
 import { useGamificationStore } from '@/stores/gamificationStore';
+import { useAuthStore } from '@/stores/authStore';
 import {
     ACHIEVEMENTS,
     RARITY_COLORS,
@@ -23,6 +26,8 @@ import { getLevelColor, getLevelProgress, formatXP, getXPForNextLevel } from '@/
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
+    const router = useRouter();
+    const { user, signOut, isLoading } = useAuthStore();
     const {
         level,
         levelTitle,
@@ -38,6 +43,28 @@ export default function ProfileScreen() {
     const levelColor = getLevelColor(level);
     const levelProgress = getLevelProgress(totalXP);
     const xpForNext = getXPForNextLevel(level);
+
+    const handleSignOut = () => {
+        Alert.alert(
+            'Sign Out',
+            'Are you sure you want to sign out?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Sign Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await signOut();
+                        router.replace('/auth/login');
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleSignIn = () => {
+        router.push('/auth/login');
+    };
 
     const categories = ['progress', 'accuracy', 'streak', 'consistency', 'problems'] as const;
     const categoryIcons: Record<string, string> = {
@@ -90,6 +117,52 @@ export default function ProfileScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Account Section */}
+                <View style={styles.accountCard}>
+                    {user ? (
+                        <>
+                            <View style={styles.accountInfo}>
+                                <View style={styles.avatarCircle}>
+                                    <Ionicons name="person" size={24} color="#fff" />
+                                </View>
+                                <View style={styles.accountDetails}>
+                                    <Text style={styles.accountEmail}>{user.email}</Text>
+                                    <Text style={styles.accountStatus}>
+                                        <Ionicons name="cloud-done" size={12} color="#10B981" /> Synced
+                                    </Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.signOutBtn}
+                                onPress={handleSignOut}
+                                disabled={isLoading}
+                            >
+                                <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <>
+                            <View style={styles.accountInfo}>
+                                <View style={[styles.avatarCircle, { backgroundColor: Colors.textMuted }]}>
+                                    <Ionicons name="person-outline" size={24} color="#fff" />
+                                </View>
+                                <View style={styles.accountDetails}>
+                                    <Text style={styles.accountEmail}>Guest Mode</Text>
+                                    <Text style={styles.accountStatus}>
+                                        <Ionicons name="cloud-offline" size={12} color="#F59E0B" /> Not synced
+                                    </Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.signInBtn}
+                                onPress={handleSignIn}
+                            >
+                                <Text style={styles.signInBtnText}>Sign In</Text>
+                            </TouchableOpacity>
+                        </>
+                    )}
+                </View>
+
                 {/* Level Card */}
                 <LinearGradient
                     colors={[levelColor, Colors.background]}
@@ -197,6 +270,56 @@ const styles = StyleSheet.create({
     scrollContent: {
         padding: Spacing.lg,
         paddingBottom: 100,
+    },
+    accountCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: Colors.surface,
+        borderRadius: BorderRadius.xl,
+        padding: Spacing.lg,
+        marginBottom: Spacing.lg,
+    },
+    accountInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    avatarCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: Colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: Spacing.md,
+    },
+    accountDetails: {
+        flex: 1,
+    },
+    accountEmail: {
+        fontSize: Fonts.base,
+        fontWeight: Fonts.semibold,
+        color: Colors.text,
+    },
+    accountStatus: {
+        fontSize: Fonts.xs,
+        color: Colors.textMuted,
+        marginTop: 2,
+    },
+    signOutBtn: {
+        padding: Spacing.sm,
+    },
+    signInBtn: {
+        backgroundColor: Colors.primary,
+        paddingHorizontal: Spacing.lg,
+        paddingVertical: Spacing.sm,
+        borderRadius: BorderRadius.lg,
+    },
+    signInBtnText: {
+        fontSize: Fonts.sm,
+        fontWeight: Fonts.bold,
+        color: '#fff',
     },
     levelCard: {
         flexDirection: 'row',

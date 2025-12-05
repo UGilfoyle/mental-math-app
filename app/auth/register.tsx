@@ -14,14 +14,16 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Spacing, BorderRadius } from '@/constants/Theme';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function RegisterScreen() {
     const router = useRouter();
+    const { signUpWithEmail, isLoading, clearError } = useAuthStore();
+
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const handleRegister = async () => {
@@ -38,13 +40,17 @@ export default function RegisterScreen() {
             return;
         }
 
-        setLoading(true);
-        // TODO: Integrate with Supabase
-        // const { error } = await auth.signUp(email, password, name);
-        setTimeout(() => {
-            setLoading(false);
-            router.replace('/auth/onboarding');
-        }, 1000);
+        clearError();
+        const result = await signUpWithEmail(email, password, name);
+        if (result.success) {
+            Alert.alert(
+                'Account Created!',
+                'Please check your email to verify your account.',
+                [{ text: 'OK', onPress: () => router.replace('/auth/login') }]
+            );
+        } else if (result.error) {
+            Alert.alert('Sign Up Failed', result.error);
+        }
     };
 
     return (
@@ -151,9 +157,9 @@ export default function RegisterScreen() {
                         <TouchableOpacity
                             style={styles.primaryButton}
                             onPress={handleRegister}
-                            disabled={loading}
+                            disabled={isLoading}
                         >
-                            {loading ? (
+                            {isLoading ? (
                                 <ActivityIndicator color="#7C3AED" />
                             ) : (
                                 <Text style={styles.primaryButtonText}>Create Account</Text>
