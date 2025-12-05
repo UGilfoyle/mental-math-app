@@ -1,16 +1,28 @@
-import 'react-native-url-polyfill/polyfill';
+// Supabase client setup
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-// Storage adapter for Supabase auth
+// Check if we're in a browser/client environment
+const isBrowser = typeof window !== 'undefined';
+
+// Storage adapter for Supabase auth - handles SSR safely
 const storage = {
-    getItem: (key: string) => AsyncStorage.getItem(key),
-    setItem: (key: string, value: string) => AsyncStorage.setItem(key, value),
-    removeItem: (key: string) => AsyncStorage.removeItem(key),
+    getItem: async (key: string) => {
+        if (!isBrowser) return null;
+        return AsyncStorage.getItem(key);
+    },
+    setItem: async (key: string, value: string) => {
+        if (!isBrowser) return;
+        return AsyncStorage.setItem(key, value);
+    },
+    removeItem: async (key: string) => {
+        if (!isBrowser) return;
+        return AsyncStorage.removeItem(key);
+    },
 };
 
 // Supabase configuration
-// TODO: Replace with your Supabase project credentials
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
 
@@ -18,8 +30,8 @@ const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-ano
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
         storage: storage,
-        autoRefreshToken: true,
-        persistSession: true,
+        autoRefreshToken: isBrowser,
+        persistSession: isBrowser,
         detectSessionInUrl: false,
     },
 });

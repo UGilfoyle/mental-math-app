@@ -118,11 +118,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             set({ isLoading: true, error: null });
 
-            // Get the redirect URL for Expo
-            const redirectUrl = AuthSession.makeRedirectUri({
-                scheme: 'mentalmathpro',
-                path: 'auth/callback',
-            });
+            // For Expo Go, we need to use the exp:// scheme
+            const redirectUrl = AuthSession.makeRedirectUri();
+
+            console.log('Redirect URL:', redirectUrl);
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -138,7 +137,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 // Open browser for OAuth
                 const result = await WebBrowser.openAuthSessionAsync(
                     data.url,
-                    redirectUrl
+                    redirectUrl,
+                    { showInRecents: true }
                 );
 
                 if (result.type === 'success' && result.url) {
