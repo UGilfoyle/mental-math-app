@@ -14,7 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing, BorderRadius, GameModes, GameMode } from '@/constants/Theme';
 import { useGameStore, useSettingsStore } from '@/stores/gameStore';
+import { useGamificationStore } from '@/stores/gamificationStore';
 import { getDailyChallenge, getTimeUntilNextChallenge, DailyChallenge } from '@/lib/dailyChallenge';
+import { getLevelColor, formatXP } from '@/lib/levels';
 import DrawerMenu from '@/components/DrawerMenu';
 
 const { width } = Dimensions.get('window');
@@ -28,10 +30,13 @@ export default function HomeScreen() {
   const router = useRouter();
   const { history, setMode } = useGameStore();
   const { hapticEnabled } = useSettingsStore();
+  const { level, totalXP, currentDayStreak } = useGamificationStore();
 
   const [showDrawer, setShowDrawer] = useState(false);
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
   const [timeRemaining, setTimeRemaining] = useState({ hours: 0, minutes: 0 });
+
+  const levelColor = getLevelColor(level);
 
   useEffect(() => {
     setDailyChallenge(getDailyChallenge());
@@ -91,10 +96,10 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <Text style={styles.title}>Mental Math</Text>
           <TouchableOpacity
-            style={styles.statsBtn}
-            onPress={() => router.push('/(tabs)/insights')}
+            style={[styles.levelBadge, { backgroundColor: levelColor }]}
+            onPress={() => router.push('/(tabs)/profile')}
           >
-            <Ionicons name="stats-chart" size={22} color="#fff" />
+            <Text style={styles.levelText}>Lv.{level}</Text>
           </TouchableOpacity>
         </View>
 
@@ -274,13 +279,17 @@ const styles = StyleSheet.create({
     fontWeight: Fonts.bold,
     color: '#fff',
   },
-  statsBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+  levelBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  levelText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#fff',
   },
 
   // Stats

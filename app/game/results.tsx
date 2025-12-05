@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -16,7 +16,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing, BorderRadius, GameModes, Difficulties } from '@/constants/Theme';
 import { useGameStore, useSettingsStore } from '@/stores/gameStore';
+import { useGamificationStore } from '@/stores/gamificationStore';
 import { formatTime, formatNumber } from '@/lib/math';
+import { calculateGameXP } from '@/lib/levels';
+import LevelUpModal from '@/components/LevelUpModal';
 
 const { width } = Dimensions.get('window');
 
@@ -33,8 +36,14 @@ export default function ResultsScreen() {
     } = useGameStore();
 
     const { hapticEnabled } = useSettingsStore();
+    const { addXP, updateStats, lastPlayDate } = useGamificationStore();
 
     const scaleAnim = useRef(new Animated.Value(0)).current;
+    const [showLevelUp, setShowLevelUp] = useState(false);
+    const [newLevel, setNewLevel] = useState(1);
+    const [xpEarned, setXpEarned] = useState(0);
+    const [xpBreakdown, setXpBreakdown] = useState<{ source: string; amount: number }[]>([]);
+    const [hasProcessedXP, setHasProcessedXP] = useState(false);
 
     const totalCount = correctCount + wrongCount;
     const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
@@ -52,7 +61,42 @@ export default function ResultsScreen() {
         if (hapticEnabled && accuracy >= 70) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-    }, []);
+
+        // Calculate and award XP (only once)
+        if (!hasProcessedXP && correctCount > 0) {
+            const today = new Date().toDateString();
+            const isFirstGameOfDay = lastPlayDate !== today;
+            const isPerfect = accuracy >= 100;
+
+            const { total, breakdown } = calculateGameXP(
+                correctCount,
+                accuracy,
+                0, // streak from game
+                isFirstGameOfDay,
+                false // not daily challenge
+            );
+
+            setXpEarned(total);
+            setXpBreakdown(breakdown);
+
+            // Award XP
+            const result = addXP(total, mode);
+            if (result.leveledUp && result.newLevel) {
+                setNewLevel(result.newLevel);
+                setTimeout(() => setShowLevelUp(true), 500);
+            }
+
+            // Update stats for achievements
+            updateStats({
+                gamesPlayed: 1,
+                correctAnswers: correctCount,
+                isPerfectGame: isPerfect,
+                streak: 0,
+            });
+
+            setHasProcessedXP(true);
+        }
+    }, [hasProcessedXP]);
 
     const handlePlayAgain = () => {
         resetGame();
@@ -134,20 +178,38 @@ export default function ResultsScreen() {
 
                         <View style={styles.statsRow}>
                             <View style={styles.statBox}>
-                                <Text style={styles.statEmoji}>⏱️</Text>
+                                <Ionicons name="time-outline" size={22} color="#fff" />
                                 <Text style={styles.statNum}>{formatTime(elapsedTime)}</Text>
                                 <Text style={styles.statLabel}>Time</Text>
                             </View>
                             <View style={styles.statBox}>
-                                <Text style={styles.statEmoji}>📊</Text>
+                                <Ionicons name="analytics-outline" size={22} color="#fff" />
                                 <Text style={styles.statNum}>{accuracy}%</Text>
                                 <Text style={styles.statLabel}>Accuracy</Text>
                             </View>
                         </View>
 
+                        {/* XP Earned */}
+                        {xpEarned > 0 && (
+                            <View style={styles.xpCard}>
+                                <View style={styles.xpHeader}>
+                                    <Ionicons name="star" size={24} color="#FFD700" />
+                                    <Text style={styles.xpTitle}>XP Earned</Text>
+                                    <Text style={styles.xpTotal}>+{xpEarned}</Text>
+                                </View>
+                                {xpBreakdown.map((item, index) => (
+                                    <View key={index} style={styles.xpRow}>
+                                        <Text style={styles.xpSource}>{item.source}</Text>
+                                        <Text style={styles.xpAmount}>+{item.amount}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
                         {/* Buttons */}
                         <TouchableOpacity style={styles.primaryBtn} onPress={handlePlayAgain}>
-                            <Text style={styles.primaryBtnText}>🔄 Play Again</Text>
+                            <Ionicons name="refresh" size={20} color="#7C3AED" />
+                            <Text style={styles.primaryBtnText}>Play Again</Text>
                         </TouchableOpacity>
 
                         <View style={styles.secondaryRow}>
@@ -164,6 +226,13 @@ export default function ResultsScreen() {
                     </Animated.View>
                 </ScrollView>
             </SafeAreaView>
+
+            {/* Level Up Modal */}
+            <LevelUpModal
+                visible={showLevelUp}
+                newLevel={newLevel}
+                onClose={() => setShowLevelUp(false)}
+            />
         </View>
     );
 }
@@ -272,9 +341,12 @@ const styles = StyleSheet.create({
     // Buttons
     primaryBtn: {
         backgroundColor: '#fff',
+        flexDirection: 'row',
         paddingVertical: Spacing.lg,
         borderRadius: BorderRadius.xl,
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.sm,
         marginTop: Spacing.lg,
         marginBottom: Spacing.md,
     },
@@ -303,5 +375,45 @@ const styles = StyleSheet.create({
         fontSize: Fonts.base,
         fontWeight: Fonts.semibold,
         color: '#fff',
+    },
+    // XP Card
+    xpCard: {
+        backgroundColor: 'rgba(255,215,0,0.15)',
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: 'rgba(255,215,0,0.3)',
+        padding: Spacing.md,
+        marginBottom: Spacing.md,
+    },
+    xpHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        marginBottom: Spacing.sm,
+    },
+    xpTitle: {
+        flex: 1,
+        fontSize: Fonts.base,
+        fontWeight: Fonts.semibold,
+        color: '#FFD700',
+    },
+    xpTotal: {
+        fontSize: Fonts.xl,
+        fontWeight: Fonts.bold,
+        color: '#FFD700',
+    },
+    xpRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
+    },
+    xpSource: {
+        fontSize: Fonts.sm,
+        color: 'rgba(255,255,255,0.7)',
+    },
+    xpAmount: {
+        fontSize: Fonts.sm,
+        fontWeight: Fonts.semibold,
+        color: '#FFD700',
     },
 });
