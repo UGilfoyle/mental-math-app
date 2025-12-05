@@ -13,7 +13,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors, Fonts, Spacing, BorderRadius, GameModes } from '@/constants/Theme';
-import { useSettingsStore } from '@/stores/gameStore';
+import { useSettingsStore, useGameStore } from '@/stores/gameStore';
+import { getComboMessage, playCorrectSound, playWrongSound, playComboSound } from '@/lib/sounds';
+import ComboPopup from '@/components/ComboPopup';
+import CorrectAnswerBurst from '@/components/ParticleEffects';
 
 const { width } = Dimensions.get('window');
 
@@ -48,19 +51,49 @@ function generateComparison() {
 
 export default function CompareGame() {
     const router = useRouter();
-    const { hapticEnabled } = useSettingsStore();
+    const { hapticEnabled, soundEnabled } = useSettingsStore();
+    const { addToHistory } = useGameStore();
 
     const [problem, setProblem] = useState(generateComparison());
     const [score, setScore] = useState(0);
     const [streak, setStreak] = useState(0);
+    const [bestStreak, setBestStreak] = useState(0);
+    const [correctCount, setCorrectCount] = useState(0);
     const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
     const [problemCount, setProblemCount] = useState(0);
     const [timeLeft, setTimeLeft] = useState(60);
     const [isGameOver, setIsGameOver] = useState(false);
+    const [hasRecordedGame, setHasRecordedGame] = useState(false);
+
+    // Candy Crush style effects
+    const [showCombo, setShowCombo] = useState(false);
+    const [comboMessage, setComboMessage] = useState({ message: '', color: '' });
+    const [showBurst, setShowBurst] = useState(false);
+    const [burstPosition, setBurstPosition] = useState({ x: width / 2, y: 300 });
 
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const leftShake = useRef(new Animated.Value(0)).current;
     const rightShake = useRef(new Animated.Value(0)).current;
+
+    // Save game to history when game ends
+    useEffect(() => {
+        if (isGameOver && !hasRecordedGame && problemCount > 0) {
+            const accuracy = problemCount > 0 ? Math.round((correctCount / problemCount) * 100) : 0;
+            addToHistory({
+                id: Date.now().toString(),
+                mode: 'compare',
+                difficulty: 'medium',
+                operation: 'mixed',
+                score,
+                correctCount,
+                totalCount: problemCount,
+                accuracy,
+                timeMs: 60000,
+                date: new Date().toISOString(),
+            });
+            setHasRecordedGame(true);
+        }
+    }, [isGameOver, hasRecordedGame]);
 
     useEffect(() => {
         if (timeLeft <= 0) {
@@ -76,25 +109,43 @@ export default function CompareGame() {
 
         const isCorrect = choice === problem.answer;
 
-        if (hapticEnabled) {
-            Haptics.notificationAsync(isCorrect
-                ? Haptics.NotificationFeedbackType.Success
-                : Haptics.NotificationFeedbackType.Error);
-        }
-
         if (isCorrect) {
+            const newStreak = streak + 1;
             setFeedback('correct');
             setScore(s => s + 10 + streak * 2);
-            setStreak(s => s + 1);
+            setStreak(newStreak);
+            setCorrectCount(c => c + 1);
+            if (newStreak > bestStreak) setBestStreak(newStreak);
+
+            // Play sound/haptic
+            playCorrectSound(newStreak);
+
+            // Show particle burst
+            setShowBurst(true);
+            setTimeout(() => setShowBurst(false), 600);
+
+            // Check for combo message
+            const combo = getComboMessage(newStreak);
+            if (combo) {
+                setComboMessage(combo);
+                setShowCombo(true);
+                playComboSound(newStreak);
+            }
+
+            // Bounce animation
             Animated.sequence([
-                Animated.timing(scaleAnim, { toValue: 1.1, duration: 100, useNativeDriver: true }),
+                Animated.timing(scaleAnim, { toValue: 1.15, duration: 100, useNativeDriver: true }),
                 Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
             ]).start();
         } else {
             setFeedback('wrong');
             setStreak(0);
+            playWrongSound();
+
             const shakeAnim = choice === 'left' ? leftShake : rightShake;
             Animated.sequence([
+                Animated.timing(shakeAnim, { toValue: 15, duration: 50, useNativeDriver: true }),
+                Animated.timing(shakeAnim, { toValue: -15, duration: 50, useNativeDriver: true }),
                 Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
                 Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
                 Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
@@ -157,6 +208,21 @@ export default function CompareGame() {
     return (
         <View style={styles.container}>
             <LinearGradient colors={modeInfo.gradient as [string, string]} style={styles.background} />
+
+            {/* Candy Crush Effects */}
+            <ComboPopup
+                streak={streak}
+                message={comboMessage.message}
+                color={comboMessage.color}
+                visible={showCombo}
+                onComplete={() => setShowCombo(false)}
+            />
+            <CorrectAnswerBurst
+                visible={showBurst}
+                x={width / 2}
+                y={300}
+                color={comboMessage.color || '#10B981'}
+            />
 
             <SafeAreaView style={styles.safeArea}>
                 {/* Header */}

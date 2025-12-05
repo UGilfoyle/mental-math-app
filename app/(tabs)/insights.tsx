@@ -64,9 +64,9 @@ export default function InsightsScreen() {
         return days;
     }, [history]);
 
-    // Mode performance
+    // Mode performance (only classic modes for now)
     const modeStats = useMemo(() => {
-        const modes: Record<GameMode, { games: number; avgAccuracy: number }> = {
+        const modes: Record<string, { games: number; avgAccuracy: number }> = {
             practice: { games: 0, avgAccuracy: 0 },
             speedrun: { games: 0, avgAccuracy: 0 },
             timeattack: { games: 0, avgAccuracy: 0 },
@@ -128,9 +128,12 @@ export default function InsightsScreen() {
                 >
                     {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.title}>📊 Insights</Text>
+                        <View style={styles.titleRow}>
+                            <Ionicons name="analytics" size={28} color="#fff" />
+                            <Text style={styles.title}>Insights</Text>
+                        </View>
                         <View style={styles.streakBadge}>
-                            <Text style={styles.streakEmoji}>🔥</Text>
+                            <Ionicons name="flame" size={16} color="#F97316" />
                             <Text style={styles.streakText}>{streak} day streak</Text>
                         </View>
                     </View>
@@ -153,22 +156,22 @@ export default function InsightsScreen() {
                     {/* Overview Stats */}
                     <View style={styles.statsGrid}>
                         <View style={styles.statCard}>
-                            <Text style={styles.statEmoji}>🎮</Text>
+                            <Ionicons name="game-controller" size={24} color="#A855F7" />
                             <Text style={styles.statValue}>{stats.totalGames}</Text>
                             <Text style={styles.statLabel}>Games</Text>
                         </View>
                         <View style={styles.statCard}>
-                            <Text style={styles.statEmoji}>✅</Text>
+                            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
                             <Text style={styles.statValue}>{stats.totalCorrect}</Text>
                             <Text style={styles.statLabel}>Correct</Text>
                         </View>
                         <View style={styles.statCard}>
-                            <Text style={styles.statEmoji}>📊</Text>
+                            <Ionicons name="analytics" size={24} color="#3B82F6" />
                             <Text style={styles.statValue}>{stats.accuracy}%</Text>
                             <Text style={styles.statLabel}>Accuracy</Text>
                         </View>
                         <View style={styles.statCard}>
-                            <Text style={styles.statEmoji}>⏱️</Text>
+                            <Ionicons name="time" size={24} color="#F59E0B" />
                             <Text style={styles.statValue}>{formatTime(stats.totalTime)}</Text>
                             <Text style={styles.statLabel}>Time</Text>
                         </View>
@@ -176,7 +179,10 @@ export default function InsightsScreen() {
 
                     {/* Activity Chart */}
                     <View style={styles.chartCard}>
-                        <Text style={styles.chartTitle}>📈 Weekly Activity</Text>
+                        <View style={styles.chartHeader}>
+                            <Ionicons name="trending-up" size={20} color="#fff" />
+                            <Text style={styles.chartTitle}>Weekly Activity</Text>
+                        </View>
                         <View style={styles.barChart}>
                             {dailyActivity.map((day, i) => (
                                 <View key={i} style={styles.barContainer}>
@@ -197,13 +203,19 @@ export default function InsightsScreen() {
 
                     {/* Mode Performance */}
                     <View style={styles.chartCard}>
-                        <Text style={styles.chartTitle}>🎯 Mode Performance</Text>
-                        {(Object.keys(modeStats) as GameMode[]).map(mode => {
-                            const info = GameModes[mode];
+                        <View style={styles.chartHeader}>
+                            <Ionicons name="podium" size={20} color="#fff" />
+                            <Text style={styles.chartTitle}>Mode Performance</Text>
+                        </View>
+                        {Object.keys(modeStats).map(mode => {
+                            const info = GameModes[mode as keyof typeof GameModes];
                             const stat = modeStats[mode];
+                            if (!info) return null;
                             return (
                                 <View key={mode} style={styles.modeRow}>
-                                    <Text style={styles.modeEmoji}>{info.icon}</Text>
+                                    <View style={styles.modeIconBox}>
+                                        <Ionicons name={info.icon as any} size={18} color="#fff" />
+                                    </View>
                                     <Text style={styles.modeName}>{info.name}</Text>
                                     <View style={styles.modeStats}>
                                         <Text style={styles.modeGames}>{stat.games} games</Text>
@@ -224,7 +236,7 @@ export default function InsightsScreen() {
 
                     {/* Tips */}
                     <View style={styles.tipCard}>
-                        <Text style={styles.tipEmoji}>💡</Text>
+                        <Ionicons name="bulb" size={24} color="#F59E0B" />
                         <Text style={styles.tipText}>
                             {stats.accuracy >= 90
                                 ? "Amazing accuracy! Try harder difficulty levels."
@@ -252,6 +264,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: Spacing.xl,
+    },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
     },
     title: {
         fontSize: Fonts['2xl'],
@@ -317,11 +334,16 @@ const styles = StyleSheet.create({
         padding: Spacing.lg,
         marginBottom: Spacing.xl,
     },
+    chartHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        marginBottom: Spacing.lg,
+    },
     chartTitle: {
         fontSize: Fonts.lg,
         fontWeight: Fonts.bold,
         color: '#fff',
-        marginBottom: Spacing.lg,
     },
 
     // Bar Chart
@@ -355,7 +377,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: Spacing.md,
     },
-    modeEmoji: { fontSize: 20, marginRight: Spacing.sm },
+    modeIconBox: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: Spacing.sm,
+    },
     modeName: { fontSize: Fonts.base, fontWeight: Fonts.medium, color: '#fff', width: 90 },
     modeStats: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
     modeGames: { fontSize: Fonts.xs, color: 'rgba(255,255,255,0.6)', width: 55 },

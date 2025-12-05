@@ -119,9 +119,9 @@ export default function PlaySetupScreen() {
                         </View>
                         <Slider
                             style={styles.slider}
-                            minimumValue={5}
-                            maximumValue={50}
-                            step={5}
+                            minimumValue={12}
+                            maximumValue={20}
+                            step={1}
                             value={problemCount}
                             onValueChange={setProblemCount}
                             minimumTrackTintColor="#fff"
@@ -129,8 +129,8 @@ export default function PlaySetupScreen() {
                             thumbTintColor="#fff"
                         />
                         <View style={styles.sliderLabels}>
-                            <Text style={styles.sliderLabel}>5</Text>
-                            <Text style={styles.sliderLabel}>50</Text>
+                            <Text style={styles.sliderLabel}>12</Text>
+                            <Text style={styles.sliderLabel}>20</Text>
                         </View>
                     </View>
 
